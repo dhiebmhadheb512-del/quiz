@@ -481,6 +481,11 @@
   .kw .ckbo { margin: 10px 0 0; background: rgba(0,0,0,.45); border-radius: 12px; padding: 8px; color: #fff; direction: rtl; }
   .kc .kn { position: absolute; left: 0; right: 26%; bottom: 2px; text-align: center; font-size: calc(var(--w) * .15); font-weight: 800; color: #222; line-height: 1; pointer-events: none; }
   .kc .kfig { left: 8%; width: 84%; top: 6%; height: 84%; }
+  .gg .gc:not(.wide) { height: 148px; min-height: 148px; justify-content: flex-start; padding-top: 18px; }
+  .gg .gc:not(.wide) .ic { font-size: 2.4rem; height: 2.7rem; display: flex; align-items: center; justify-content: center; }
+  .gg .gc:not(.wide) small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #app:has(.bd, .twb, .c4b, .ldw, .kw, .xob, .dmw) { padding-left: 6px; padding-right: 6px; }
+  .sq.hint { box-shadow: inset 0 0 0 4px #2fc46b; }
 </style>
 </head>
 <body>
@@ -1066,7 +1071,7 @@ const GAMES = [
   { id: 'domino', ic: '🧩', name: 'دومينو', desc: 'ضد الكمبيوتر' },
   { id: 'ludo', ic: '🎯', name: 'لودو', desc: 'الكلاسيكية: 2 ولا 4 لاعبين' },
   { id: 'tawla', ic: '🎲', name: 'طاولة', desc: 'النرد التونسي، ضد الكمبيوتر وصحابك' },
-  { id: 'chkobba', ic: '🎴', name: 'شكوبة', desc: 'الكارطة التونسية، لين 11' },
+  { id: 'chkobba', ic: '🎴', name: 'شكوبة', desc: 'الكارطة التونسية، لين 21' },
   { id: 'checkers', ic: '⚫', name: 'دامة', desc: 'ضد الكمبيوتر، لازم تاكل' },
   { id: 'xo', ic: '❌', name: 'XO', desc: '3 في صف' },
   { id: 'wil', ic: '🗺️', name: 'ولايات تونس', desc: 'الـ24 ولاية، اكتبهم وعرف جهاتهم' },
@@ -2142,10 +2147,18 @@ function bgPage(title, sub, body) {
     <div id="bgb">${body}</div>`;
   document.getElementById('back').addEventListener('click', () => { bg = null; home(); });
 }
+function bgStat(id) { try { return Object.assign({ g: 0, w: 0, d: 0 }, JSON.parse(store('bgs') || '{}')[id] || {}); } catch (e) { return { g: 0, w: 0, d: 0 }; } }
+function bgRec(id, res) {
+  try { const a = JSON.parse(store('bgs') || '{}'), z = Object.assign({ g: 0, w: 0, d: 0 }, a[id] || {}); z.g++; if (res === 'win') z.w++; if (res === 'draw') z.d++; a[id] = z; store('bgs', JSON.stringify(a)); } catch (e) {}
+}
+function bgStatBox(id) {
+  const z = bgStat(id);
+  return z.g ? `<div class="namebox"><small>📊 لعبت ${z.g} · ربحت ${z.w} · تعادل ${z.d} · نسبة الربح ${Math.round(z.w * 100 / z.g)}%</small></div>` : '';
+}
 function bgMenu(id, ic, name, desc, levels) {
-  bgPage(ic + ' ' + name, desc, levels
+  bgPage(ic + ' ' + name, desc, bgStatBox(id) + (levels
     ? `<div class="namebox"><b>اختار الصعوبة</b></div>` + LVL.map(l => `<button class="primary" data-l="${l[0]}" style="margin-bottom:10px">${l[1]}</button>`).join('')
-    : `<button class="primary" data-l="2">ابدا اللعبة</button>`);
+    : `<button class="primary" data-l="2">ابدا اللعبة</button>`));
   app.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => {
     const l = Number(b.dataset.l);
     id === 'chess' ? chStart(l) : id === 'c4' ? c4Start(l) : id === 'checkers' ? ckStart(l) : id === 'xo' ? xoStart(l) : id === 'chkobba' ? ckbStart(l) : id === 'tawla' ? twStart(l) : dmStart();
@@ -2155,6 +2168,7 @@ function bgEnd(res, pts, text) {
   const g = bg;
   if (!g || g.over) return;
   g.over = true;
+  if (g.game) bgRec(g.game, res);
   award(pts, res === 'win');
   if (res === 'win') { sfx('win'); confetti(60); } else sfx(res === 'draw' ? 'pop' : 'bad');
   const box = document.getElementById('bres');
@@ -2278,7 +2292,7 @@ function chApply(pos, m) {
     if (s === 0) cs.q = 0;
   };
   const wasCap = !!b[m.t] || m.ep;
-  b[m.t] = m.pr ? (w ? 'Q' : 'q') : p;
+  b[m.t] = m.pr ? (w ? (m.pt || 'Q').toUpperCase() : (m.pt || 'q').toLowerCase()) : p;
   b[m.f] = '';
   if (m.ep) b[m.t + (w ? 8 : -8)] = '';
   if (m.cs) {
@@ -2344,23 +2358,38 @@ function chBest(pos, depth) {
 function chStart(lvl) {
   const g = bg = { game: 'chess', lvl, pos: chInit(), sel: -1, last: null, over: false, busy: false, ply: 0, msg: 'دورك (الأبيض). اختار قطعة.' };
   g.again = () => chStart(lvl);
-  g.hist = []; g.undos = 0;
+  g.hist = []; g.undos = 0; g.hints = 0; g.hint = null; g.promoPend = false;
   g.legal = chLegal(g.pos);
-  bgPage('♟️ شطرنج', '', `<div id="bmsg" class="home-sub"></div><div class="bd" id="bd"></div><div id="bres"></div>
-    <div class="joinrow"><button class="ghost" id="bundo">↩️ تراجع</button><button class="ghost" id="bres2">🏳️ استسلم</button><button class="ghost" id="bnew">لعبة جديدة</button></div>`);
+  bgPage('♟️ شطرنج', '', `<div id="bmsg" class="home-sub"></div><div id="bcap" class="home-sub" style="margin:0 0 4px;min-height:1.4em"></div><div class="bd" id="bd"></div><div id="bres"></div><div id="bpro"></div>
+    <div class="joinrow"><button class="ghost" id="bundo">↩️ تراجع</button><button class="ghost" id="bhint">💡 تلميح</button><button class="ghost" id="bres2">🏳️ استسلم</button><button class="ghost" id="bnew">لعبة جديدة</button></div>
+    <small style="display:block;text-align:center">كل تراجع ولا تلميح ينقّص 10 نقاط من الربح</small>`);
+  document.getElementById('bhint').addEventListener('click', () => {
+    if (g.over || g.busy || g.promoPend || bg !== g || g.pos.turn !== 'w' || !g.legal.length) return;
+    const m = chBest(g.pos, 3);
+    g.hints++; g.hint = { f: m.f, t: m.t }; g.sel = m.f;
+    g.msg = '💡 جرّب تحرّك القطعة المحدّدة للمربّع المضوّي';
+    chDraw(g);
+  });
   document.getElementById('bundo').addEventListener('click', () => {
     if (g.over || g.busy || !g.hist.length || bg !== g) return;
     const h = g.hist.pop();
-    g.pos = h.pos; g.last = h.last; g.ply = h.ply; g.sel = -1; g.legal = chLegal(g.pos); g.undos++;
+    g.pos = h.pos; g.last = h.last; g.ply = h.ply; g.sel = -1; g.hint = null; g.legal = chLegal(g.pos); g.undos++;
     g.msg = 'رجعت حركة (كل تراجع ينقّص 10 نقاط من الربح)';
     chDraw(g);
   });
   document.getElementById('bd').addEventListener('click', e => {
     const q = e.target.closest('.sq');
-    if (!q || g.over || g.busy || bg !== g) return;
+    if (!q || g.over || g.busy || g.promoPend || bg !== g) return;
     const s = Number(q.dataset.s), p = g.pos.b[s];
     if (g.sel >= 0) {
       const m = g.legal.find(x => x.f === g.sel && x.t === s);
+      if (m && m.pr && g.pos.turn === 'w') {
+        g.promoPend = true;
+        const box = document.getElementById('bpro');
+        box.innerHTML = '<div class="namebox"><b>بدّل الجندي بـ:</b><div class="joinrow" style="margin-top:8px">' + [['Q', '♛ وزير'], ['R', '♜ قلعة'], ['B', '♝ فيل'], ['N', '♞ حصان']].map(x => `<button class="ghost" data-pt="${x[0]}">${x[1]}</button>`).join('') + '</div></div>';
+        box.querySelectorAll('[data-pt]').forEach(b => b.addEventListener('click', () => { m.pt = b.dataset.pt; g.promoPend = false; box.innerHTML = ''; chMove(g, m); }));
+        return;
+      }
       if (m) return chMove(g, m);
     }
     g.sel = p && isW(p) ? s : -1;
@@ -2370,8 +2399,16 @@ function chStart(lvl) {
   document.getElementById('bnew').addEventListener('click', () => chStart(lvl));
   chDraw(g);
 }
+function chCapHtml(b) {
+  const full = { P: 8, N: 2, B: 2, R: 2, Q: 1 }, cnt = {};
+  b.forEach(p => { if (p && p.toUpperCase() !== 'K') cnt[p] = (cnt[p] || 0) + 1; });
+  const row = (white) => Object.keys(full).map(k => { const c = white ? k : k.toLowerCase(), miss = full[k] - (cnt[c] || 0); return miss > 0 ? `<span class="pc ${white ? 'w' : 'b'}" style="font-size:1.1rem">${CG[k].repeat(miss)}</span>` : ''; }).join('');
+  const mine = row(false), theirs = row(true);
+  return (mine ? 'أكلت: ' + mine : '') + (mine && theirs ? ' · ' : '') + (theirs ? 'أكلو: ' + theirs : '');
+}
 function chDraw(g) {
   if (bg !== g) return;
+  const cp = document.getElementById('bcap'); if (cp) cp.innerHTML = chCapHtml(g.pos.b);
   const pos = g.pos, b = pos.b;
   const tg = new Set(g.sel >= 0 ? g.legal.filter(m => m.f === g.sel).map(m => m.t) : []);
   const chk = chInCheck(pos) ? chKing(b, pos.turn === 'w') : -1;
@@ -2379,7 +2416,7 @@ function chDraw(g) {
   for (let s = 0; s < 64; s++) {
     const r = s >> 3, c = s & 7, p = b[s];
     const cl = ['sq', (r + c) % 2 ? 'd' : '', s === g.sel ? 'sel' : '', tg.has(s) ? (p ? 'cap' : 'mv') : '',
-      g.last && (g.last.f === s || g.last.t === s) ? 'last' : '', s === chk ? 'chk' : ''].join(' ');
+      g.last && (g.last.f === s || g.last.t === s) ? 'last' : '', s === chk ? 'chk' : '', g.hint && (g.hint.f === s || g.hint.t === s) ? 'hint' : ''].join(' ');
     h += `<div class="${cl}" data-s="${s}">${p ? `<span class="pc ${isW(p) ? 'w' : 'b'}">${CG[p.toUpperCase()]}︎</span>` : ''}</div>`;
   }
   document.getElementById('bd').innerHTML = h;
@@ -2387,9 +2424,10 @@ function chDraw(g) {
 }
 function chMove(g, m) {
   if (g.pos.turn === 'w') g.hist.push({ pos: g.pos, last: g.last, ply: g.ply });
+  const cap = !!g.pos.b[m.t] || !!m.ep;
   g.pos = chApply(g.pos, m);
-  g.last = m; g.sel = -1; g.ply++;
-  sfx('pop');
+  g.last = m; g.sel = -1; g.hint = null; g.ply++;
+  sfx(chInCheck(g.pos) ? 'bad' : cap ? 'hit' : 'pop');
   chAfter(g);
 }
 function chAfter(g) {
@@ -2400,7 +2438,7 @@ function chAfter(g) {
     if (chInCheck(pos)) {
       g.msg = human ? 'كش مات! الكمبيوتر ربح' : 'كش مات! ربحت 🎉';
       chDraw(g);
-      return human ? bgEnd('loss', 10, 'خسرت') : bgEnd('win', Math.max(30, 100 - 10 * g.undos), 'ربحت! برافو');
+      return human ? bgEnd('loss', 10, 'خسرت') : bgEnd('win', Math.max(30, 100 - 10 * (g.undos + g.hints)), 'ربحت! برافو');
     }
     g.msg = 'تعادل (ما فماش حركة)';
     chDraw(g);
@@ -2979,8 +3017,22 @@ function ckStart(lvl) {
   g.again = () => ckStart(lvl);
   g.moves = ckMoves(g.b, 'w');
   bgPage('⚫ دامة', 'لازم تاكل كي تنجم. الحجر اللي يوصل للآخر يولّي ملك 👑', `<div id="bmsg" class="home-sub"></div><div class="bd" id="bd"></div><div id="bres"></div>
-    <div class="joinrow"><button class="ghost" id="bnew">لعبة جديدة</button></div>`);
+    <div class="joinrow"><button class="ghost" id="bundo">↩️ تراجع</button><button class="ghost" id="bhint">💡 تلميح</button><button class="ghost" id="bnew">لعبة جديدة</button></div>
+    <small style="display:block;text-align:center">كل تراجع ولا تلميح ينقّص 10 نقاط من الربح</small>`);
+  g.hist = []; g.undos = 0; g.hints = 0; g.hint = null;
   document.getElementById('bnew').addEventListener('click', () => ckStart(lvl));
+  document.getElementById('bundo').addEventListener('click', () => {
+    if (g.over || g.busy || !g.hist.length || bg !== g) return;
+    const h = g.hist.pop();
+    g.b = h.b; g.turn = 'w'; g.last = h.last; g.q = h.q; g.ply = h.ply; g.sel = -1; g.hint = null; g.moves = ckMoves(g.b, 'w'); g.undos++;
+    g.msg = 'رجعت حركة'; ckDraw(g);
+  });
+  document.getElementById('bhint').addEventListener('click', () => {
+    if (g.over || g.busy || bg !== g || g.turn !== 'w' || !g.moves.length) return;
+    const m = ckBest(g.b, 'w', 3);
+    g.hints++; g.hint = [m.path[0], m.path[m.path.length - 1]]; g.sel = m.path[0];
+    g.msg = '💡 حرّك الحجر المحدّد للمربّع المضوّي'; ckDraw(g);
+  });
   document.getElementById('bd').addEventListener('click', e => {
     const q = e.target.closest('.sq');
     if (!q || g.over || g.busy || bg !== g) return;
@@ -2997,22 +3049,24 @@ function ckStart(lvl) {
 function ckDraw(g) {
   if (bg !== g) return;
   const tg = new Set(g.sel >= 0 ? g.moves.filter(m => m.path[0] === g.sel).map(m => m.path[m.path.length - 1]) : []);
-  document.getElementById('bd').innerHTML = ckHtml(g.b, g.sel, tg, g.last, false);
+  document.getElementById('bd').innerHTML = ckHtml(g.b, g.sel, tg, g.hint || g.last, false);
   document.getElementById('bmsg').textContent = g.msg;
 }
 function ckMove(g, m) {
+  if (g.turn === 'w' && g.hist) g.hist.push({ b: g.b, last: g.last, q: g.q, ply: g.ply });
+  g.hint = null;
   g.q = ckQuiet(g.b, m, g.q);
   g.b = ckApply(g.b, m);
   g.last = [m.path[0], m.path[m.path.length - 1]];
   g.sel = -1; g.ply++;
   g.turn = g.turn === 'w' ? 'b' : 'w';
-  sfx('pop');
+  sfx(m.caps && m.caps.length ? 'hit' : 'pop');
   g.moves = ckMoves(g.b, g.turn);
   if (!g.moves.length) {
     const win = g.turn === 'b';
     g.msg = win ? 'ربحت! 🎉' : 'الكمبيوتر ربح';
     ckDraw(g);
-    return win ? bgEnd('win', 80, 'ربحت! برافو') : bgEnd('loss', 8, 'خسرت');
+    return win ? bgEnd('win', Math.max(30, 80 - 10 * ((g.undos || 0) + (g.hints || 0))), 'ربحت! برافو') : bgEnd('loss', 8, 'خسرت');
   }
   if (g.q >= 100 || g.ply >= 300) { g.msg = 'تعادل'; ckDraw(g); return bgEnd('draw', 25, 'تعادل'); }
   if (g.turn === 'w') {
@@ -3881,7 +3935,7 @@ async function invShare() {
   try { await navigator.clipboard.writeText(txt); toast('📋 الرابط تنسخ، ابعثو لصحابك'); } catch (e) { prompt('انسخ الرابط:', invLink()); }
 }
 function invBox() {
-  return '<button class="gc wide" id="inv" style="width:100%;margin-bottom:12px;min-height:60px"><span class="ic">👥</span><span><b>ادعو صحابك</b><br><small>كل صاحب يدخل بالرابط تاخذ ' + INV_PTS + ' نقطة (حتى ' + INV_MAX + ')</small></span></button>'
+  return '<button class="gc wide" id="inv" style="width:100%;margin-bottom:12px;min-height:60px"><span class="ic">👥</span><span><b>ادعو صحابك</b><br><small>كل صاحب يدخل بالرابط = ' + INV_PTS + ' نقطة</small></span></button>'
     + '<button class="gc wide" id="frb" style="width:100%;margin-bottom:12px;min-height:60px"><span class="ic">🤝</span><span><b>أصحابي</b><br><small>شوف شكون أونلاين وادعوهم للعب</small></span></button>'
     + (navigator.onLine ? '' : '<div class="chip" style="margin:0 0 10px">📴 ما فماش إنترنت: الألعاب ضد الكمبيوتر تخدم عادي</div>');
 }
@@ -4056,30 +4110,69 @@ async function frPicker(code, game) {
   }));
 }
 /* --- موسيقى خفيفة --- */
-let MUS = store('music') === '1', musT = null, musI = 0;
-const MUS_N = [293.66, 349.23, 440, 392, 349.23, 293.66, 261.63, 293.66, 349.23, 440, 523.25, 440, 392, 349.23, 329.63, 293.66];
-const MUS_B = [146.83, 146.83, 130.81, 130.81, 116.54, 116.54, 110, 110];
+let MUS = store('music') === '1', musT = null, musI = 0, NB = null;
+/* أغنية «يا تونس الخضراء»: لحن أصلي على مقام حجاز (ري)، إيقاع 6/8، 4 سطور × 24 خطوة */
+const MUS_F = { D3: 146.83, A3: 220, D4: 293.66, Eb4: 311.13, Fs4: 369.99, G4: 392, A4: 440, Bb4: 466.16, C5: 523.25, D5: 587.33, Eb5: 622.25 };
+const MUS_L = ['يا تونس الخضراء يا بلادي النوارة', 'حبك في ڨلبي حرارة', 'مهما يصير و مهما يطوول الزمان', 'تبقى انتي زينة البلدان'];
+const MUS_SONG = [
+  'A4:2 D5:3 C5:1 Bb4:2 A4:2 G4:2 A4:2 Bb4:2 A4:2 G4:2 A4:4',
+  'D5:3 C5:1 Bb4:2 A4:3 Bb4:1 A4:2 G4:2 Fs4:2 G4:2 A4:2 Bb4:2 A4:2',
+  'C5:2 D5:2 Eb5:2 D5:2 C5:2 Bb4:2 C5:2 D5:3 Eb5:1 D5:2 C5:2 Bb4:2',
+  'A4:2 Bb4:2 A4:2 G4:2 Fs4:2 G4:2 Bb4:1 A4:1 G4:2 Fs4:2 Eb4:2 D4:4'
+];
+const MUS_M = [];
+MUS_SONG.forEach(line => line.split(' ').forEach(x => { const [n, d] = x.split(':'); MUS_M.push({ f: MUS_F[n], n: +d }); for (let k = 1; k < +d; k++) MUS_M.push(null); }));
+const MUS_P = 'D - t - D t D - t - t t'.split(' ');
+const MUS_S = 190;
+function musLyr(i) {
+  let el = document.getElementById('lyr');
+  if (!MUS) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'lyr';
+    el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(8px + env(safe-area-inset-bottom));max-width:92vw;z-index:15;background:rgba(0,0,0,.55);color:#fff;border-radius:14px;padding:6px 14px;font-weight:700;font-size:.95rem;text-align:center;pointer-events:none;direction:rtl;transition:opacity .3s';
+    document.body.appendChild(el);
+  }
+  el.textContent = '🎶 ' + MUS_L[Math.floor(i / 24) % 4];
+}
 function musTick() {
   if (!MUS || MUTE) return;
   try {
     AC = AC || new (window.AudioContext || window.webkitAudioContext)();
     if (AC.state === 'suspended') AC.resume();
-    const t = AC.currentTime + .02;
-    const note = (f, d, ty, v) => {
-      const o = AC.createOscillator(), g = AC.createGain();
-      o.type = ty; o.frequency.value = f;
-      g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(v, t + .04); g.gain.exponentialRampToValueAtTime(.0001, t + d);
-      o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + d + .05);
-    };
-    note(MUS_N[musI % 16], .55, 'triangle', .03);
-    if (musI % 2 === 0) note(MUS_B[(musI / 2) % 8], .95, 'sine', .035);
+    const t = AC.currentTime + .02, i = musI % 96;
+    const env = (g, d, v, a) => { g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(v, t + (a || .01)); g.gain.exponentialRampToValueAtTime(.0001, t + d); };
+    if (i % 24 === 0) musLyr(i);
+    const nt = MUS_M[i];
+    if (nt) {
+      const f = nt.f, d = nt.n * MUS_S / 1000 + .12;
+      const g = AC.createGain(), bp = AC.createBiquadFilter(), lfo = AC.createOscillator(), lg = AC.createGain();
+      bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 1.6;
+      lfo.frequency.value = 5.5; lg.gain.value = f * .008; lfo.connect(lg);
+      env(g, d, .085, .03); bp.connect(g); g.connect(AC.destination);
+      [0, 9].forEach(cents => { const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = cents; lg.connect(o.frequency); o.connect(bp); o.start(t); o.stop(t + d + .05); });
+      lfo.start(t); lfo.stop(t + d + .05);
+      if (nt.n >= 3) {
+        const o = AC.createOscillator(), gg = AC.createGain(); o.type = 'sawtooth'; o.frequency.value = f * 1.0595;
+        gg.gain.setValueAtTime(.04, t); gg.gain.exponentialRampToValueAtTime(.0001, t + .05); o.connect(gg); gg.connect(bp); o.start(t); o.stop(t + .06);
+      }
+    }
+    if (i % 12 === 0) {
+      [MUS_F.D3, MUS_F.A3].forEach((fr, k) => { const o = AC.createOscillator(), g = AC.createGain(), lp = AC.createBiquadFilter(); o.type = 'sawtooth'; o.frequency.value = fr; lp.type = 'lowpass'; lp.frequency.value = 400; env(g, 2.4, k ? .012 : .02, .15); o.connect(lp); lp.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + 2.5); });
+    }
+    const p = MUS_P[i % 12];
+    if (p === 'D') { const o = AC.createOscillator(), g = AC.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(55, t + .12); env(g, .24, .11); o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + .3); }
+    else if (p === 't') {
+      if (!NB) { NB = AC.createBuffer(1, 2205, AC.sampleRate); const d = NB.getChannelData(0); for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1; }
+      const n = AC.createBufferSource(), g = AC.createGain(), hp = AC.createBiquadFilter();
+      n.buffer = NB; hp.type = 'highpass'; hp.frequency.value = 3000; env(g, .07, .05, .002); n.connect(hp); hp.connect(g); g.connect(AC.destination); n.start(t);
+    }
     musI++;
   } catch (e) {}
 }
 function musSet(on) {
   MUS = on; store('music', on ? '1' : '0');
   clearInterval(musT); musT = null;
-  if (on) { musTick(); musT = setInterval(musTick, 480); }
+  if (on) { musI = 0; musTick(); musT = setInterval(musTick, MUS_S); } else musLyr(0);
 }
 if (MUS) musSet(true);
 window.addEventListener('offline', () => toast('📴 ما فماش إنترنت'));
@@ -4323,7 +4416,20 @@ function twStart(lvl) {
   const g = bg = { game: 'tawla', lvl, S: twNew(), sel: null, over: false, busy: false, msg: 'ارمي النرد باش تبدا.', seqs: [] };
   g.again = () => twStart(lvl);
   bgPage('🎲 طاولة', 'انت الأبيض ⚪: تبدا من فوق يمين، تلف على اليسار، وتوصل لتحت يمين. اضرب حجر الخصم إذا كان وحدو.', `<div id="bmsg" class="home-sub"></div><div id="bd"></div><div id="bres"></div>
-    <div class="joinrow"><button class="ghost" id="bnew">لعبة جديدة</button></div>`);
+    <div class="joinrow"><button class="ghost" id="bundo">↩️ تراجع</button><button class="ghost" id="bhint">💡 تلميح</button><button class="ghost" id="bnew">لعبة جديدة</button></div>
+    <small style="display:block;text-align:center">كل تراجع ولا تلميح ينقّص 10 نقاط من الربح</small>`);
+  g.tst = []; g.pen = 0;
+  document.getElementById('bundo').addEventListener('click', () => {
+    if (g.over || g.busy || bg !== g || g.S.t !== 0 || !g.tst.length) return;
+    const h = g.tst.pop();
+    g.S = h.S; g.seqs = h.seqs; g.sel = null; g.pen++; g.msg = 'رجعت حركة'; twDraw(g);
+  });
+  document.getElementById('bhint').addEventListener('click', () => {
+    if (g.over || g.busy || bg !== g || g.S.t !== 0 || !g.S.rem.length || !g.seqs.length) return;
+    const sq = twPick(g.S, 0, g.seqs, 2);
+    if (!sq || !sq.length) return;
+    g.pen++; g.sel = sq[0].f; g.msg = '💡 حرّك الحجر المحدّد (هذا أحسن اختيار)'; twDraw(g);
+  });
   document.getElementById('bnew').addEventListener('click', () => twStart(lvl));
   document.getElementById('bd').addEventListener('click', e => {
     if (g.over || g.busy || bg !== g) return;
@@ -4345,6 +4451,7 @@ function twDraw(g) {
   document.getElementById('bd').innerHTML = twHtml(g.S, 0, pr.sel, pr.dsts, g.S.t === 0 && !g.S.rem.length && !g.busy && !g.over, g.S.t === 0 && !g.busy ? pr.srcs : []);
 }
 function twDoRoll(g, p) {
+  if (g.tst) g.tst = [];
   const d = twRoll();
   g.S = Object.assign({}, g.S, { dice: d, rem: twRem(d) });
   g.seqs = twSeqs(g.S, p, g.S.rem);
@@ -4368,6 +4475,7 @@ function twPass(g) {
   else { g.msg = 'دور الكمبيوتر...'; g.busy = true; twDraw(g); setTimeout(() => { if (bg !== g || g.over) return; g.busy = false; twDoRoll(g, 1); }, 900); }
 }
 function twDoMove(g, p, m) {
+  if (p === 0 && g.tst) g.tst.push({ S: g.S, seqs: g.seqs });
   const S2 = twApply(g.S, p, m);
   S2.rem = twRemove(g.S.rem, m.v);
   g.S = S2; g.sel = null;
@@ -4375,10 +4483,10 @@ function twDoMove(g, p, m) {
   if (S2.off[p] === 15) {
     g.msg = p === 0 ? 'ربحت اللعبة! 🎉' : 'الكمبيوتر ربح';
     twDraw(g);
-    return p === 0 ? bgEnd('win', 90, 'ربحت! برافو') : bgEnd('loss', 10, 'خسرت');
+    return p === 0 ? bgEnd('win', Math.max(40, 90 - 10 * (g.pen || 0)), 'ربحت! برافو') : bgEnd('loss', 10, 'خسرت');
   }
   g.seqs = S2.rem.length ? twSeqs(S2, p, S2.rem) : [];
-  if (!g.seqs.length) { twDraw(g); return setTimeout(() => { if (bg === g && !g.over) twPass(g); }, 700); }
+  if (!g.seqs.length) { twDraw(g); return setTimeout(() => { if (bg === g && !g.over && !g.seqs.length && g.S.t === p) twPass(g); }, 700); }
   twDraw(g);
 }
 function twAiPlay(g) {
