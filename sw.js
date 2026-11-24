@@ -1,6 +1,6 @@
 /* Service worker: يخلّي اللعبة تفتح بسرعة وتخدم بالقليل من الإنترنت.
    كل ما تبدّل النسخة، بدّل رقم VERSION. */
-const VERSION = 'v32';
+const VERSION = 'v33';
 const CACHE = 'chnwa-ta3ref-' + VERSION;
 const SHELL = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 

@@ -3,5 +3,5 @@
    2) انسخ رابط الـ TURN credentials API متاعك (فيه apiKey) وحطو بين الجوج علامات تنصيص في turnApi.
    مثال: turnApi: 'https://اسم-تطبيقك.metered.live/api/v1/turn/credentials?apiKey=المفتاح' */
 window.CHNWA = {
-  turnApi: ''
+  turnApi: 'https://chnwa-taaref.metered.live/api/v1/turn/credentials?apiKey=aIP3VnhBlcsyseM5Q4oh6JcX7fma2SUVjn28wOSPebHqX6xw'
 };
